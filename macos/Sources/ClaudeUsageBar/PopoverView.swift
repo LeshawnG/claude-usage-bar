@@ -245,8 +245,10 @@ private struct UsageBucketRow: View {
                     .font(.subheadline)
                     .monospacedDigit()
             }
-            ProgressView(value: (bucket?.utilization ?? 0) / 100.0, total: 1.0)
-                .tint(colorForPct((bucket?.utilization ?? 0) / 100.0))
+            UsageBar(
+                value: (bucket?.utilization ?? 0) / 100.0,
+                color: colorForPct((bucket?.utilization ?? 0) / 100.0)
+            )
             Group {
                 if let resetDate = bucket?.resetsAtDate {
                     Text("Resets \(resetDate, style: .relative)")
@@ -284,17 +286,37 @@ private struct ExtraUsageRow: View {
                             .monospacedDigit()
                     }
                 }
-                ProgressView(value: (extra.utilization ?? 0) / 100.0, total: 1.0)
-                    .tint(.blue)
+                UsageBar(value: (extra.utilization ?? 0) / 100.0, color: .blue)
             }
         }
     }
 }
 
 private func colorForPct(_ pct: Double) -> Color {
-    switch pct {
-    case ..<0.60: return .green
-    case 0.60..<0.80: return .yellow
-    default: return .red
+    switch UsageLevel(pct) {
+    case .normal: return .green
+    case .warning: return .yellow
+    case .critical: return .red
+    }
+}
+
+/// Drawn instead of a tinted ProgressView, which can fall back to the system
+/// accent color after a light/dark switch. Same 6pt bar in an 18pt row.
+private struct UsageBar: View {
+    let value: Double
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            Capsule()
+                .fill(.quaternary)
+                .overlay(alignment: .leading) {
+                    Capsule()
+                        .fill(color)
+                        .frame(width: geometry.size.width * min(value, 1))
+                }
+        }
+        .frame(height: 6)
+        .padding(.vertical, 6)
     }
 }

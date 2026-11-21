@@ -378,6 +378,19 @@ struct UsageBucket: Codable {
     }
 }
 
+/// Shared by the popover and the menu bar so both change color at the same usage.
+enum UsageLevel {
+    case normal, warning, critical
+
+    init(_ pct: Double) {
+        switch pct {
+        case ..<0.60: self = .normal
+        case ..<0.80: self = .warning
+        default: self = .critical
+        }
+    }
+}
+
 struct ExtraUsage: Codable {
     let isEnabled: Bool
     let utilization: Double?

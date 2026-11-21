@@ -61,6 +61,13 @@ final class UsageModelTests: XCTestCase {
         XCTAssertNil(reconciled.fiveHour?.resetsAtDate)
     }
 
+    func testUsageLevelTurnsYellowAt60AndRedAt80() {
+        XCTAssertEqual(UsageLevel(0.59), .normal)
+        XCTAssertEqual(UsageLevel(0.60), .warning)
+        XCTAssertEqual(UsageLevel(0.79), .warning)
+        XCTAssertEqual(UsageLevel(0.80), .critical)
+    }
+
     func testReconcilePreservesValidServerReset() throws {
         let previous = usageResponse(
             fiveHour: UsageBucket(utilization: 100.0, resetsAt: "2026-03-05T18:00:00Z")
