@@ -14,15 +14,21 @@ private let iconHeight: CGFloat = 18
 private let fontSize: CGFloat = 8
 private let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium)
 
+private let pctFont = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .semibold)
+
 // Room for two digits; the icon widens only while a window is at 100% or more.
-private let pctWidth: CGFloat = ceil(text("99%", ink: .black).size().width)
+private let pctWidth: CGFloat = ceil(pctText(0.99, ink: .black).size().width)
 
 private func text(_ string: String, ink: NSColor) -> NSAttributedString {
     NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: ink])
 }
 
-private func pctString(_ pct: Double) -> String {
-    "\(Int(round(pct * 100)))%"
+/// Digits blur sooner than the 5h/7d labels at this size, so they're semibold with 1.5pt before the "%".
+private func pctText(_ pct: Double, ink: NSColor) -> NSAttributedString {
+    let string = "\(Int(round(pct * 100)))%"
+    let text = NSMutableAttributedString(string: string, attributes: [.font: pctFont, .foregroundColor: ink])
+    text.addAttribute(.kern, value: 1.5, range: NSRange(location: string.count - 2, length: 1))
+    return text
 }
 
 private func warningColor(for pct: Double) -> NSColor? {
@@ -44,9 +50,9 @@ private func drawRow(label: String, barX: CGFloat, barY: CGFloat, labelX: CGFloa
     labelText.draw(at: NSPoint(x: labelX + labelWidth - labelSize.width, y: barY + (barHeight - labelSize.height) / 2))
     drawBarFill(barX, barY)
     if let pct {
-        let pctText = text(pctString(pct), ink: ink)
-        let size = pctText.size()
-        pctText.draw(at: NSPoint(x: pctRightEdge - size.width, y: barY + (barHeight - size.height) / 2))
+        let pctLabel = pctText(pct, ink: ink)
+        let size = pctLabel.size()
+        pctLabel.draw(at: NSPoint(x: pctRightEdge - size.width, y: barY + (barHeight - size.height) / 2))
     }
 }
 
@@ -61,7 +67,7 @@ func renderIcon(
 ) -> NSImage {
     let shown = [pct5h, pct7d].compactMap { $0 }
     let pctColumn = showsPercentages
-        ? shown.map { ceil(text(pctString($0), ink: .black).size().width) }.reduce(pctWidth, max)
+        ? shown.map { ceil(pctText($0, ink: .black).size().width) }.reduce(pctWidth, max)
         : 0
     let width = iconWidth + pctColumn
     let isColored = usesWarningColors && shown.contains { warningColor(for: $0) != nil }
