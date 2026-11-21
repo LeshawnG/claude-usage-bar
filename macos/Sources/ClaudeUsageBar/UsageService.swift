@@ -26,6 +26,7 @@ class UsageService: ObservableObject {
     var notificationService: NotificationService?
 
     private var timer: Timer?
+    private var resetTimer: Timer?
     private let session: URLSession
     private let usageEndpoint: URL
     private let profileEndpoint: URL
@@ -199,6 +200,27 @@ class UsageService: ObservableObject {
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
+    }
+
+    /// Polls just after the soonest reset, so the finished window doesn't stay
+    /// on screen, its countdown counting up, until the next scheduled poll.
+    private func scheduleResetRefresh() {
+        resetTimer?.invalidate()
+        resetTimer = nil
+        guard let fireDate = Self.resetRefreshDate(resets: [reset5h, reset7d], now: Date()) else { return }
+        let t = Timer(fire: fireDate, interval: 0, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isAuthenticated else { return }
+                Task { await self.poll() }
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        resetTimer = t
+    }
+
+    /// Past resets are skipped, so a server still reporting the old window can't cause a polling loop.
+    nonisolated static func resetRefreshDate(resets: [Date?], now: Date) -> Date? {
+        resets.compactMap { $0 }.filter { $0 > now }.min()?.addingTimeInterval(5)
     }
 
     // MARK: - OAuth PKCE Flow
@@ -444,6 +466,8 @@ class UsageService: ObservableObject {
         accounts = updated
         guard accounts.first?.id != shown else { return }
         usage = nil
+        resetTimer?.invalidate()
+        resetTimer = nil
         lastUpdated = nil
         lastError = nil
         historyService?.setAccount(accounts.first?.profileID)
@@ -527,6 +551,7 @@ class UsageService: ObservableObject {
             let decoded = try JSONDecoder().decode(UsageResponse.self, from: data)
             let reconciled = decoded.reconciled(with: usage)
             usage = reconciled
+            scheduleResetRefresh()
             hasFiveHourWindow = reconciled.fiveHour != nil
             defaults.set(hasFiveHourWindow, forKey: Self.hasFiveHourWindowKey)
             lastError = nil

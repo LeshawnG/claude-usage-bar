@@ -24,6 +24,16 @@ final class UsageServiceTests: XCTestCase {
         )
     }
 
+    func testResetRefreshFollowsTheSoonestFutureReset() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let soon = now.addingTimeInterval(60)
+        XCTAssertEqual(
+            UsageService.resetRefreshDate(resets: [now.addingTimeInterval(-60), nil, now.addingTimeInterval(3600), soon], now: now),
+            soon.addingTimeInterval(5)
+        )
+        XCTAssertNil(UsageService.resetRefreshDate(resets: [now.addingTimeInterval(-60), nil], now: now))
+    }
+
     func testFetchUsageRefreshesOn401AndRetriesOnce() async throws {
         let store = try makeStore()
         try store.save(
