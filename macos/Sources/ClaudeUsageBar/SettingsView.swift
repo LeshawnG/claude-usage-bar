@@ -20,6 +20,12 @@ struct SettingsWindowContent: View {
                             .tag(mins)
                     }
                 }
+
+                Toggle("Refresh when opened", isOn: Binding(
+                    get: { service.refreshesOnOpen },
+                    set: { service.setRefreshesOnOpen($0) }
+                ))
+                .help("Updates when you open the popover, at most once a minute.")
             }
 
             Section("Menu Bar") {

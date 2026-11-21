@@ -17,6 +17,7 @@ class UsageService: ObservableObject {
     @Published private(set) var showsMenuBarPercentages: Bool
     @Published private(set) var showsTimeMarkers: Bool
     @Published private(set) var usesWarningColors: Bool
+    @Published private(set) var refreshesOnOpen: Bool
 
     var isAuthenticated: Bool { !accounts.isEmpty }
     var accountEmail: String? { accounts.first?.email }
@@ -62,6 +63,7 @@ class UsageService: ObservableObject {
     nonisolated private static let showsMenuBarPercentagesKey = "showsMenuBarPercentages"
     nonisolated private static let showsTimeMarkersKey = "showsTimeMarkers"
     nonisolated private static let usesWarningColorsKey = "usesWarningColors"
+    nonisolated private static let refreshesOnOpenKey = "refreshesOnOpen"
     nonisolated private static let loopbackHosts: Set<String> = ["localhost", "127.0.0.1", "::1"]
 
     /// Endpoint override for testing against `scripts/mock-server.py`.
@@ -127,6 +129,22 @@ class UsageService: ObservableObject {
     func setUsesWarningColors(_ uses: Bool) {
         usesWarningColors = uses
         defaults.set(uses, forKey: Self.usesWarningColorsKey)
+    }
+
+    func setRefreshesOnOpen(_ refreshes: Bool) {
+        refreshesOnOpen = refreshes
+        defaults.set(refreshes, forKey: Self.refreshesOnOpenKey)
+    }
+
+    /// At most once a minute and never during a 429 backoff, so opening the popover often can't get the app rate limited.
+    func popoverDidOpen() {
+        guard refreshesOnOpen, isAuthenticated, !isBackingOff, Self.isStale(lastUpdated, now: Date()) else { return }
+        Task { await poll() }
+    }
+
+    nonisolated static func isStale(_ lastUpdated: Date?, now: Date) -> Bool {
+        guard let lastUpdated else { return true }
+        return now.timeIntervalSince(lastUpdated) >= 60
     }
 
     /// Redraws once a minute so the markers move; the 5-hour one crosses a Retina pixel about every 6 minutes.
@@ -202,6 +220,7 @@ class UsageService: ObservableObject {
         self.showsMenuBarPercentages = defaults.bool(forKey: Self.showsMenuBarPercentagesKey)
         self.showsTimeMarkers = defaults.bool(forKey: Self.showsTimeMarkersKey)
         self.usesWarningColors = defaults.bool(forKey: Self.usesWarningColorsKey)
+        self.refreshesOnOpen = defaults.bool(forKey: Self.refreshesOnOpenKey)
         let stored = UserDefaults.standard.integer(forKey: "pollingMinutes")
         let minutes = Self.pollingOptions.contains(stored) ? stored : Self.defaultPollingMinutes
         self.pollingMinutes = minutes

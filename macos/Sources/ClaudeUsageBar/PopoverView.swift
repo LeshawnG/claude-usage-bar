@@ -17,6 +17,7 @@ struct PopoverView: View {
         }
         .padding()
         .frame(width: 340)
+        .background(WindowKeyObserver { service.popoverDidOpen() })
     }
 
     @ViewBuilder
@@ -318,5 +319,33 @@ private struct UsageBar: View {
         }
         .frame(height: 6)
         .padding(.vertical, 6)
+    }
+}
+
+/// Calls `action` each time the hosting window becomes key, which for the menu bar
+/// popover is every time it opens. Its view stays in the window between opens, so
+/// `onAppear` can't be relied on for this.
+private struct WindowKeyObserver: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> ObserverView { ObserverView() }
+
+    func updateNSView(_ view: ObserverView, context: Context) {
+        view.action = action
+    }
+
+    final class ObserverView: NSView {
+        var action: () -> Void = {}
+        private var observer: NSObjectProtocol?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = window.map {
+                NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: $0, queue: .main) { [weak self] _ in
+                    self?.action()
+                }
+            }
+        }
     }
 }
