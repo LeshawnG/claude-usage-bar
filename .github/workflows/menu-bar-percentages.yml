@@ -1,0 +1,39 @@
+name: Menu bar percentages build
+
+on:
+  push:
+    branches: [menu-bar-percentages]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    env:
+      # Upstream release this branch is based on; bump when rebasing so Sparkle still offers newer releases.
+      APP_VERSION: 0.0.13
+      # Upstream's feed, not this fork's: release.yml derives the feed from the repo owner.
+      SU_FEED_URL: https://blimp-labs.github.io/claude-usage-bar/appcast.xml
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Run tests
+        run: cd macos && swift test
+
+      - name: Build app and ZIP
+        run: bash macos/scripts/build.sh --zip
+
+      - name: Check bundle
+        run: |
+          app=macos/ClaudeUsageBar.app
+          codesign --verify --deep --strict "$app"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' -c 'Print :SUFeedURL' "$app/Contents/Info.plist"
+          vtool -show-build "$app/Contents/MacOS/ClaudeUsageBar" | grep -E 'minos|sdk'
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ClaudeUsageBar-${{ env.APP_VERSION }}-percentages
+          path: macos/ClaudeUsageBar.zip
