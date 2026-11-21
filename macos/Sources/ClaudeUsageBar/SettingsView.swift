@@ -20,10 +20,21 @@ struct SettingsWindowContent: View {
                             .tag(mins)
                     }
                 }
+            }
 
-                Toggle("Show percentages in menu bar", isOn: Binding(
+            Section("Menu Bar") {
+                Toggle("Show percentages", isOn: Binding(
                     get: { service.showsMenuBarPercentages },
                     set: { service.setShowsMenuBarPercentages($0) }
+                ))
+                Toggle("Show time marker", isOn: Binding(
+                    get: { service.showsTimeMarkers },
+                    set: { service.setShowsTimeMarkers($0) }
+                ))
+                .help("A notch on each bar shows how far through the window you are.")
+                Toggle("Color bars at 60% and 80%", isOn: Binding(
+                    get: { service.usesWarningColors },
+                    set: { service.setUsesWarningColors($0) }
                 ))
             }
 

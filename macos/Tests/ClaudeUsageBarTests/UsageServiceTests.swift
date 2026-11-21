@@ -34,6 +34,13 @@ final class UsageServiceTests: XCTestCase {
         XCTAssertNil(UsageService.resetRefreshDate(resets: [now.addingTimeInterval(-60), nil], now: now))
     }
 
+    func testWindowProgressIsTheShareOfTheWindowElapsed() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertEqual(UsageService.windowProgress(reset: now.addingTimeInterval(3600), length: 4 * 3600, now: now), 0.75)
+        XCTAssertEqual(UsageService.windowProgress(reset: now.addingTimeInterval(-60), length: 3600, now: now), 1)
+        XCTAssertNil(UsageService.windowProgress(reset: nil, length: 3600, now: now))
+    }
+
     func testFetchUsageRefreshesOn401AndRetriesOnce() async throws {
         let store = try makeStore()
         try store.save(

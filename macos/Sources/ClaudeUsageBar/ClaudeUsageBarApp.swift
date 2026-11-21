@@ -18,7 +18,10 @@ struct ClaudeUsageBarApp: App {
                 ? renderIcon(
                     pct5h: service.hasFiveHourWindow ? service.pct5h : nil,
                     pct7d: service.pct7d,
-                    showsPercentages: service.showsMenuBarPercentages
+                    showsPercentages: service.showsMenuBarPercentages,
+                    marker5h: service.showsTimeMarkers ? service.progress5h : nil,
+                    marker7d: service.showsTimeMarkers ? service.progress7d : nil,
+                    usesWarningColors: service.usesWarningColors
                 )
                 : renderUnauthenticatedIcon()
             )

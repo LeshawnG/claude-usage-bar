@@ -12,69 +12,80 @@ private let barsWidth: CGFloat = labelWidth + labelGap + barWidth + 2
 private let iconWidth: CGFloat = logoSize + logoGap + barsWidth
 private let iconHeight: CGFloat = 18
 private let fontSize: CGFloat = 8
+private let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium)
 
-private let labelAttributes: [NSAttributedString.Key: Any] = [
-    .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium),
-    .foregroundColor: NSColor.black,
-]
 // Room for two digits; the icon widens only while a window is at 100% or more.
-private let pctWidth: CGFloat = ceil(pctText(0.99).size().width)
+private let pctWidth: CGFloat = ceil(text("99%", ink: .black).size().width)
 
-private func pctText(_ pct: Double) -> NSAttributedString {
-    NSAttributedString(string: "\(Int(round(pct * 100)))%", attributes: labelAttributes)
+private func text(_ string: String, ink: NSColor) -> NSAttributedString {
+    NSAttributedString(string: string, attributes: [.font: font, .foregroundColor: ink])
 }
 
-private struct CachedLabel {
-    let string: NSAttributedString
-    let size: NSSize
+private func pctString(_ pct: Double) -> String {
+    "\(Int(round(pct * 100)))%"
 }
 
-private let cachedLabels: [String: CachedLabel] = {
-    var result = [String: CachedLabel]()
-    for label in ["5h", "7d"] {
-        let str = NSAttributedString(string: label, attributes: labelAttributes)
-        result[label] = CachedLabel(string: str, size: str.size())
+private func warningColor(for pct: Double) -> NSColor? {
+    switch UsageLevel(pct) {
+    case .normal: return nil
+    case .warning: return .systemYellow
+    case .critical: return .systemRed
     }
-    return result
-}()
+}
 
-private func drawRow(label: String, barX: CGFloat, barY: CGFloat, labelX: CGFloat, pct: Double? = nil, pctRightEdge: CGFloat = 0, drawBarFill: (CGFloat, CGFloat) -> Void) {
-    if let cached = cachedLabels[label] {
-        let labelY = barY + (barHeight - cached.size.height) / 2
-        cached.string.draw(at: NSPoint(x: labelX + labelWidth - cached.size.width, y: labelY))
-    }
+/// Template images can't hold color, so a colored icon draws its own black or white to suit the menu bar.
+private func menuBarInk() -> NSColor {
+    NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .white : .black
+}
+
+private func drawRow(label: String, barX: CGFloat, barY: CGFloat, labelX: CGFloat, ink: NSColor, pct: Double?, pctRightEdge: CGFloat, drawBarFill: (CGFloat, CGFloat) -> Void) {
+    let labelText = text(label, ink: ink)
+    let labelSize = labelText.size()
+    labelText.draw(at: NSPoint(x: labelX + labelWidth - labelSize.width, y: barY + (barHeight - labelSize.height) / 2))
     drawBarFill(barX, barY)
     if let pct {
-        let text = pctText(pct)
-        let size = text.size()
-        text.draw(at: NSPoint(x: pctRightEdge - size.width, y: barY + (barHeight - size.height) / 2))
+        let pctText = text(pctString(pct), ink: ink)
+        let size = pctText.size()
+        pctText.draw(at: NSPoint(x: pctRightEdge - size.width, y: barY + (barHeight - size.height) / 2))
     }
 }
 
-func renderIcon(pct5h: Double?, pct7d: Double, showsPercentages: Bool) -> NSImage {
+/// `marker5h`/`marker7d` are the share of each window elapsed, drawn as a notch; nil draws none.
+func renderIcon(
+    pct5h: Double?,
+    pct7d: Double,
+    showsPercentages: Bool,
+    marker5h: Double? = nil,
+    marker7d: Double? = nil,
+    usesWarningColors: Bool = false
+) -> NSImage {
+    let shown = [pct5h, pct7d].compactMap { $0 }
     let pctColumn = showsPercentages
-        ? [pct5h, pct7d].compactMap { $0 }.map { ceil(pctText($0).size().width) }.reduce(pctWidth, max)
+        ? shown.map { ceil(text(pctString($0), ink: .black).size().width) }.reduce(pctWidth, max)
         : 0
     let width = iconWidth + pctColumn
+    let isColored = usesWarningColors && shown.contains { warningColor(for: $0) != nil }
+
     let image = NSImage(size: NSSize(width: width, height: iconHeight), flipped: true) { _ in
+        let ink = isColored ? menuBarInk() : .black
         let offset = logoSize + logoGap
         let barX = offset + labelWidth + labelGap
         let topY = (iconHeight - barHeight * 2 - rowGap) / 2
         let bottomY = pct5h == nil ? (iconHeight - barHeight) / 2 : topY + barHeight + rowGap
 
-        drawClaudeLogo(x: 0, y: (iconHeight - logoSize) / 2, size: logoSize)
+        drawClaudeLogo(x: 0, y: (iconHeight - logoSize) / 2, size: logoSize, ink: ink)
 
-        if let pct5h {
-            drawRow(label: "5h", barX: barX, barY: topY, labelX: offset, pct: showsPercentages ? pct5h : nil, pctRightEdge: width) { x, y in
-                drawBar(x: x, y: y, width: barWidth, height: barHeight, cornerRadius: cornerRadius, pct: pct5h)
+        let rows: [(String, Double?, Double?, CGFloat)] = [("5h", pct5h, marker5h, topY), ("7d", pct7d, marker7d, bottomY)]
+        for (label, pct, marker, y) in rows {
+            guard let pct else { continue }
+            let fill = usesWarningColors ? warningColor(for: pct) ?? ink : ink
+            drawRow(label: label, barX: barX, barY: y, labelX: offset, ink: ink, pct: showsPercentages ? pct : nil, pctRightEdge: width) { x, y in
+                drawBar(x: x, y: y, width: barWidth, height: barHeight, cornerRadius: cornerRadius, pct: pct, ink: ink, fill: fill, marker: marker)
             }
-        }
-        drawRow(label: "7d", barX: barX, barY: bottomY, labelX: offset, pct: showsPercentages ? pct7d : nil, pctRightEdge: width) { x, y in
-            drawBar(x: x, y: y, width: barWidth, height: barHeight, cornerRadius: cornerRadius, pct: pct7d)
         }
         return true
     }
-    image.isTemplate = true
+    image.isTemplate = !isColored
     return image
 }
 
@@ -85,13 +96,12 @@ func renderUnauthenticatedIcon() -> NSImage {
         let topY = (iconHeight - barHeight * 2 - rowGap) / 2
         let bottomY = topY + barHeight + rowGap
 
-        drawClaudeLogo(x: 0, y: (iconHeight - logoSize) / 2, size: logoSize)
+        drawClaudeLogo(x: 0, y: (iconHeight - logoSize) / 2, size: logoSize, ink: .black)
 
-        drawRow(label: "5h", barX: barX, barY: topY, labelX: offset) { x, y in
-            drawDashedBar(x: x, y: y, width: barWidth, height: barHeight, cornerRadius: cornerRadius)
-        }
-        drawRow(label: "7d", barX: barX, barY: bottomY, labelX: offset) { x, y in
-            drawDashedBar(x: x, y: y, width: barWidth, height: barHeight, cornerRadius: cornerRadius)
+        for (label, y) in [("5h", topY), ("7d", bottomY)] {
+            drawRow(label: label, barX: barX, barY: y, labelX: offset, ink: .black, pct: nil, pctRightEdge: iconWidth) { x, y in
+                drawDashedBar(x: x, y: y, width: barWidth, height: barHeight, cornerRadius: cornerRadius)
+            }
         }
         return true
     }
@@ -101,10 +111,10 @@ func renderUnauthenticatedIcon() -> NSImage {
 
 // MARK: - Bar drawing
 
-private func drawBar(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat, cornerRadius: CGFloat, pct: Double) {
+private func drawBar(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat, cornerRadius: CGFloat, pct: Double, ink: NSColor, fill: NSColor, marker: Double?) {
     let bgRect = NSRect(x: x, y: y, width: width, height: height)
     let bgPath = NSBezierPath(roundedRect: bgRect, xRadius: cornerRadius, yRadius: cornerRadius)
-    NSColor.black.withAlphaComponent(0.25).setFill()
+    ink.withAlphaComponent(0.25).setFill()
     bgPath.fill()
 
     let clampedPct = max(0, min(1, pct))
@@ -112,8 +122,12 @@ private func drawBar(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat, co
         let fillWidth = width * clampedPct
         let fillRect = NSRect(x: x, y: y, width: fillWidth, height: height)
         let fillPath = NSBezierPath(roundedRect: fillRect, xRadius: cornerRadius, yRadius: cornerRadius)
-        NSColor.black.setFill()
+        fill.setFill()
         fillPath.fill()
+    }
+
+    if let marker {
+        NSRect(x: x + width * marker - 0.5, y: y - 1, width: 1, height: height + 2).fill(using: .clear)
     }
 }
 
@@ -137,7 +151,12 @@ private let claudeLogoImage: NSImage? = {
     return nil
 }()
 
-private func drawClaudeLogo(x: CGFloat, y: CGFloat, size: CGFloat) {
+private func drawClaudeLogo(x: CGFloat, y: CGFloat, size: CGFloat, ink: NSColor) {
     guard let logo = claudeLogoImage else { return }
-    logo.draw(in: NSRect(x: x, y: y, width: size, height: size))
+    let rect = NSRect(x: x, y: y, width: size, height: size)
+    logo.draw(in: rect)
+    if ink != .black {
+        ink.setFill()
+        rect.fill(using: .sourceAtop)
+    }
 }

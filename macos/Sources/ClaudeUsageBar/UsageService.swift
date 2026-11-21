@@ -15,6 +15,8 @@ class UsageService: ObservableObject {
     /// so the menu bar icon has the right shape before the first fetch.
     @Published private(set) var hasFiveHourWindow: Bool
     @Published private(set) var showsMenuBarPercentages: Bool
+    @Published private(set) var showsTimeMarkers: Bool
+    @Published private(set) var usesWarningColors: Bool
 
     var isAuthenticated: Bool { !accounts.isEmpty }
     var accountEmail: String? { accounts.first?.email }
@@ -27,6 +29,7 @@ class UsageService: ObservableObject {
 
     private var timer: Timer?
     private var resetTimer: Timer?
+    private var markerTimer: Timer?
     private let session: URLSession
     private let usageEndpoint: URL
     private let profileEndpoint: URL
@@ -57,6 +60,8 @@ class UsageService: ObservableObject {
     nonisolated static let usageEndpointOverrideKey = "CLAUDE_USAGE_BAR_USAGE_ENDPOINT"
     nonisolated private static let hasFiveHourWindowKey = "hasFiveHourWindow"
     nonisolated private static let showsMenuBarPercentagesKey = "showsMenuBarPercentages"
+    nonisolated private static let showsTimeMarkersKey = "showsTimeMarkers"
+    nonisolated private static let usesWarningColorsKey = "usesWarningColors"
     nonisolated private static let loopbackHosts: Set<String> = ["localhost", "127.0.0.1", "::1"]
 
     /// Endpoint override for testing against `scripts/mock-server.py`.
@@ -113,6 +118,32 @@ class UsageService: ObservableObject {
         defaults.set(shows, forKey: Self.showsMenuBarPercentagesKey)
     }
 
+    func setShowsTimeMarkers(_ shows: Bool) {
+        showsTimeMarkers = shows
+        defaults.set(shows, forKey: Self.showsTimeMarkersKey)
+        updateMarkerTimer()
+    }
+
+    func setUsesWarningColors(_ uses: Bool) {
+        usesWarningColors = uses
+        defaults.set(uses, forKey: Self.usesWarningColorsKey)
+    }
+
+    /// Redraws once a minute so the markers move; the 5-hour one crosses a Retina pixel about every 6 minutes.
+    private func updateMarkerTimer() {
+        markerTimer?.invalidate()
+        markerTimer = nil
+        guard showsTimeMarkers else { return }
+        let t = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isAuthenticated else { return }
+                self.objectWillChange.send()
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        markerTimer = t
+    }
+
     private var baseInterval: TimeInterval { TimeInterval(pollingMinutes * 60) }
 
     nonisolated static func backoffInterval(
@@ -135,6 +166,14 @@ class UsageService: ObservableObject {
     var pctExtra: Double { (usage?.extraUsage?.utilization ?? 0) / 100.0 }
     var reset5h: Date? { usage?.fiveHour?.resetsAtDate }
     var reset7d: Date? { usage?.sevenDay?.resetsAtDate }
+    var progress5h: Double? { Self.windowProgress(reset: reset5h, length: 5 * 60 * 60, now: Date()) }
+    var progress7d: Double? { Self.windowProgress(reset: reset7d, length: 7 * 24 * 60 * 60, now: Date()) }
+
+    /// Share of a window already elapsed, or nil when no window is running.
+    nonisolated static func windowProgress(reset: Date?, length: TimeInterval, now: Date) -> Double? {
+        guard let reset else { return nil }
+        return min(max(1 - reset.timeIntervalSince(now) / length, 0), 1)
+    }
 
     init(
         session: URLSession = .shared,
@@ -160,6 +199,8 @@ class UsageService: ObservableObject {
         self.defaults = defaults
         self.hasFiveHourWindow = defaults.object(forKey: Self.hasFiveHourWindowKey) as? Bool ?? true
         self.showsMenuBarPercentages = defaults.bool(forKey: Self.showsMenuBarPercentagesKey)
+        self.showsTimeMarkers = defaults.bool(forKey: Self.showsTimeMarkersKey)
+        self.usesWarningColors = defaults.bool(forKey: Self.usesWarningColorsKey)
         let stored = UserDefaults.standard.integer(forKey: "pollingMinutes")
         let minutes = Self.pollingOptions.contains(stored) ? stored : Self.defaultPollingMinutes
         self.pollingMinutes = minutes
@@ -169,6 +210,7 @@ class UsageService: ObservableObject {
         } catch {
             lastError = Self.unreadableAccountsMessage(error)
         }
+        updateMarkerTimer()
     }
 
     private static func unreadableAccountsMessage(_ error: Error) -> String {
