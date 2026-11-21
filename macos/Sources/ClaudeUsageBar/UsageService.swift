@@ -14,6 +14,7 @@ class UsageService: ObservableObject {
     /// False when the server reports no 5-hour window (Ultra plans). Remembered
     /// so the menu bar icon has the right shape before the first fetch.
     @Published private(set) var hasFiveHourWindow: Bool
+    @Published private(set) var showsMenuBarPercentages: Bool
 
     var isAuthenticated: Bool { !accounts.isEmpty }
     var accountEmail: String? { accounts.first?.email }
@@ -54,6 +55,7 @@ class UsageService: ObservableObject {
     nonisolated private static let defaultRedirectURI = "https://platform.claude.com/oauth/code/callback"
     nonisolated static let usageEndpointOverrideKey = "CLAUDE_USAGE_BAR_USAGE_ENDPOINT"
     nonisolated private static let hasFiveHourWindowKey = "hasFiveHourWindow"
+    nonisolated private static let showsMenuBarPercentagesKey = "showsMenuBarPercentages"
     nonisolated private static let loopbackHosts: Set<String> = ["localhost", "127.0.0.1", "::1"]
 
     /// Endpoint override for testing against `scripts/mock-server.py`.
@@ -105,6 +107,11 @@ class UsageService: ObservableObject {
         }
     }
 
+    func setShowsMenuBarPercentages(_ shows: Bool) {
+        showsMenuBarPercentages = shows
+        defaults.set(shows, forKey: Self.showsMenuBarPercentagesKey)
+    }
+
     private var baseInterval: TimeInterval { TimeInterval(pollingMinutes * 60) }
 
     nonisolated static func backoffInterval(
@@ -151,6 +158,7 @@ class UsageService: ObservableObject {
         self.startCallbackListener = startCallbackListener
         self.defaults = defaults
         self.hasFiveHourWindow = defaults.object(forKey: Self.hasFiveHourWindowKey) as? Bool ?? true
+        self.showsMenuBarPercentages = defaults.bool(forKey: Self.showsMenuBarPercentagesKey)
         let stored = UserDefaults.standard.integer(forKey: "pollingMinutes")
         let minutes = Self.pollingOptions.contains(stored) ? stored : Self.defaultPollingMinutes
         self.pollingMinutes = minutes

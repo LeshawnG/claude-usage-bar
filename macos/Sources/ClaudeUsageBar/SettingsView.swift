@@ -20,6 +20,11 @@ struct SettingsWindowContent: View {
                             .tag(mins)
                     }
                 }
+
+                Toggle("Show percentages in menu bar", isOn: Binding(
+                    get: { service.showsMenuBarPercentages },
+                    set: { service.setShowsMenuBarPercentages($0) }
+                ))
             }
 
             Section("Notifications") {

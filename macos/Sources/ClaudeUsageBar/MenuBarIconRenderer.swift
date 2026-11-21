@@ -13,32 +13,44 @@ private let iconWidth: CGFloat = logoSize + logoGap + barsWidth
 private let iconHeight: CGFloat = 18
 private let fontSize: CGFloat = 8
 
+private let labelAttributes: [NSAttributedString.Key: Any] = [
+    .font: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium),
+    .foregroundColor: NSColor.black,
+]
+// Sized for "100%" so the icon keeps its width as the numbers change.
+private let pctWidth: CGFloat = ceil(NSAttributedString(string: "100%", attributes: labelAttributes).size().width)
+private let pctIconWidth: CGFloat = iconWidth + pctWidth
+
 private struct CachedLabel {
     let string: NSAttributedString
     let size: NSSize
 }
 
 private let cachedLabels: [String: CachedLabel] = {
-    let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .medium)
-    let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
     var result = [String: CachedLabel]()
     for label in ["5h", "7d"] {
-        let str = NSAttributedString(string: label, attributes: attrs)
+        let str = NSAttributedString(string: label, attributes: labelAttributes)
         result[label] = CachedLabel(string: str, size: str.size())
     }
     return result
 }()
 
-private func drawRow(label: String, barX: CGFloat, barY: CGFloat, labelX: CGFloat, drawBarFill: (CGFloat, CGFloat) -> Void) {
+private func drawRow(label: String, barX: CGFloat, barY: CGFloat, labelX: CGFloat, pct: Double? = nil, drawBarFill: (CGFloat, CGFloat) -> Void) {
     if let cached = cachedLabels[label] {
         let labelY = barY + (barHeight - cached.size.height) / 2
         cached.string.draw(at: NSPoint(x: labelX + labelWidth - cached.size.width, y: labelY))
     }
     drawBarFill(barX, barY)
+    if let pct {
+        let text = NSAttributedString(string: "\(Int(round(pct * 100)))%", attributes: labelAttributes)
+        let size = text.size()
+        text.draw(at: NSPoint(x: pctIconWidth - size.width, y: barY + (barHeight - size.height) / 2))
+    }
 }
 
-func renderIcon(pct5h: Double?, pct7d: Double) -> NSImage {
-    let image = NSImage(size: NSSize(width: iconWidth, height: iconHeight), flipped: true) { _ in
+func renderIcon(pct5h: Double?, pct7d: Double, showsPercentages: Bool) -> NSImage {
+    let width = showsPercentages ? pctIconWidth : iconWidth
+    let image = NSImage(size: NSSize(width: width, height: iconHeight), flipped: true) { _ in
         let offset = logoSize + logoGap
         let barX = offset + labelWidth + labelGap
         let topY = (iconHeight - barHeight * 2 - rowGap) / 2
@@ -47,11 +59,11 @@ func renderIcon(pct5h: Double?, pct7d: Double) -> NSImage {
         drawClaudeLogo(x: 0, y: (iconHeight - logoSize) / 2, size: logoSize)
 
         if let pct5h {
-            drawRow(label: "5h", barX: barX, barY: topY, labelX: offset) { x, y in
+            drawRow(label: "5h", barX: barX, barY: topY, labelX: offset, pct: showsPercentages ? pct5h : nil) { x, y in
                 drawBar(x: x, y: y, width: barWidth, height: barHeight, cornerRadius: cornerRadius, pct: pct5h)
             }
         }
-        drawRow(label: "7d", barX: barX, barY: bottomY, labelX: offset) { x, y in
+        drawRow(label: "7d", barX: barX, barY: bottomY, labelX: offset, pct: showsPercentages ? pct7d : nil) { x, y in
             drawBar(x: x, y: y, width: barWidth, height: barHeight, cornerRadius: cornerRadius, pct: pct7d)
         }
         return true
