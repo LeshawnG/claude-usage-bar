@@ -45,6 +45,22 @@ final class UsageModelTests: XCTestCase {
         XCTAssertEqual(reconciled.fiveHour?.resetsAtDate, date("2026-03-05T23:00:00Z"))
     }
 
+    func testReconcileLeavesNoResetForAnUnusedWindowAfterRollover() throws {
+        let previous = usageResponse(
+            fiveHour: UsageBucket(utilization: 100.0, resetsAt: "2026-03-05T18:00:00Z")
+        )
+        let current = usageResponse(
+            fiveHour: UsageBucket(utilization: 0.0, resetsAt: nil)
+        )
+
+        let reconciled = current.reconciled(
+            with: previous,
+            now: date("2026-03-05T18:05:00Z")
+        )
+
+        XCTAssertNil(reconciled.fiveHour?.resetsAtDate)
+    }
+
     func testReconcilePreservesValidServerReset() throws {
         let previous = usageResponse(
             fiveHour: UsageBucket(utilization: 100.0, resetsAt: "2026-03-05T18:00:00Z")

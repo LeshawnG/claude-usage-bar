@@ -312,6 +312,8 @@ struct UsageBucket: Codable {
     func reconciled(with previous: UsageBucket?, resetInterval: TimeInterval, now: Date) -> UsageBucket {
         guard resetsAtDate == nil else { return self }
         guard let previousDate = previous?.resetsAtDate else { return self }
+        // Unused since the last reset means no window is running, so there is no next reset to predict.
+        if previousDate <= now, utilization == 0 { return self }
 
         let resolvedDate = Self.nextResetDate(
             from: previousDate,
