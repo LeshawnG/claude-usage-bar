@@ -145,6 +145,7 @@ class UsageService: ObservableObject {
     }
 
     private var baseInterval: TimeInterval { TimeInterval(pollingMinutes * 60) }
+    private var isBackingOff: Bool { currentInterval != baseInterval }
 
     nonisolated static func backoffInterval(
         retryAfter: TimeInterval?,
@@ -252,7 +253,8 @@ class UsageService: ObservableObject {
         guard let fireDate = Self.resetRefreshDate(resets: [reset5h, reset7d], now: Date()) else { return }
         let t = Timer(fire: fireDate, interval: 0, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self, self.isAuthenticated else { return }
+                // A 429 backoff already decides when to ask again.
+                guard let self, self.isAuthenticated, !self.isBackingOff else { return }
                 Task { await self.poll() }
             }
         }
