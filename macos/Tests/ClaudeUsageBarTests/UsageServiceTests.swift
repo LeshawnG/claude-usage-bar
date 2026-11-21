@@ -34,11 +34,11 @@ final class UsageServiceTests: XCTestCase {
         XCTAssertNil(UsageService.resetRefreshDate(resets: [now.addingTimeInterval(-60), nil], now: now))
     }
 
-    func testOpeningThePopoverRefreshesAtMostOnceAMinute() {
+    func testOpeningThePopoverRefreshesAfterTwoMinutes() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         XCTAssertTrue(UsageService.isStale(nil, now: now))
-        XCTAssertFalse(UsageService.isStale(now.addingTimeInterval(-59), now: now))
-        XCTAssertTrue(UsageService.isStale(now.addingTimeInterval(-60), now: now))
+        XCTAssertFalse(UsageService.isStale(now.addingTimeInterval(-119), now: now))
+        XCTAssertTrue(UsageService.isStale(now.addingTimeInterval(-120), now: now))
     }
 
     func testWindowProgressIsTheShareOfTheWindowElapsed() {

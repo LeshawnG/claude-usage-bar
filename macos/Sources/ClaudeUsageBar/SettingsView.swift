@@ -25,7 +25,7 @@ struct SettingsWindowContent: View {
                     get: { service.refreshesOnOpen },
                     set: { service.setRefreshesOnOpen($0) }
                 ))
-                .help("Updates when you open the popover, at most once a minute.")
+                .help("Updates when you open the popover if the last update is 2 or more minutes old.")
             }
 
             Section("Menu Bar") {

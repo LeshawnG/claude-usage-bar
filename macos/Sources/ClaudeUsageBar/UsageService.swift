@@ -136,7 +136,7 @@ class UsageService: ObservableObject {
         defaults.set(refreshes, forKey: Self.refreshesOnOpenKey)
     }
 
-    /// At most once a minute and never during a 429 backoff, so opening the popover often can't get the app rate limited.
+    /// Only when the last update is 2+ minutes old and never during a 429 backoff, so opening the popover often can't get the app rate limited.
     func popoverDidOpen() {
         guard refreshesOnOpen, isAuthenticated, !isBackingOff, Self.isStale(lastUpdated, now: Date()) else { return }
         Task { await poll() }
@@ -144,7 +144,7 @@ class UsageService: ObservableObject {
 
     nonisolated static func isStale(_ lastUpdated: Date?, now: Date) -> Bool {
         guard let lastUpdated else { return true }
-        return now.timeIntervalSince(lastUpdated) >= 60
+        return now.timeIntervalSince(lastUpdated) >= 2 * 60
     }
 
     /// Redraws once a minute so the markers move; the 5-hour one crosses a Retina pixel about every 6 minutes.
