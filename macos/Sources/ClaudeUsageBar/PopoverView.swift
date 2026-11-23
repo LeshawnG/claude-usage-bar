@@ -245,10 +245,6 @@ private struct UsageBucketRow: View {
         return Pace(used: used / 100.0, elapsed: elapsed)
     }
 
-    private var paceSuffix: String {
-        pace.map { " · \($0.label)" } ?? ""
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -267,7 +263,13 @@ private struct UsageBucketRow: View {
             )
             Group {
                 if let resetDate = bucket?.resetsAtDate {
-                    Text("Resets \(resetDate, style: .relative)\(paceSuffix)")
+                    HStack {
+                        Text("Resets \(resetDate, style: .relative)")
+                        Spacer()
+                        if let pace {
+                            Text(pace.label)
+                        }
+                    }
                 } else if bucket?.utilization == 0 {
                     Text("Starts with your next message")
                 }
