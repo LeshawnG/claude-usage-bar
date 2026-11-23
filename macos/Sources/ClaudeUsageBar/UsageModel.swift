@@ -391,6 +391,25 @@ enum UsageLevel {
     }
 }
 
+/// Usage against the share of the window elapsed, in percentage points; within 3 counts as on pace.
+enum Pace: Equatable {
+    case under(Int), on, over(Int)
+
+    init(used: Double, elapsed: Double) {
+        let points = Int(round((used - elapsed) * 100))
+        switch points {
+        case ...(-4): self = .under(-points)
+        case 4...: self = .over(points)
+        default: self = .on
+        }
+    }
+
+    var isOver: Bool {
+        if case .over = self { return true }
+        return false
+    }
+}
+
 struct ExtraUsage: Codable {
     let isEnabled: Bool
     let utilization: Double?

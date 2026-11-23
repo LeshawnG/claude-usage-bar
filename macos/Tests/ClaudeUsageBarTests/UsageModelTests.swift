@@ -68,6 +68,12 @@ final class UsageModelTests: XCTestCase {
         XCTAssertEqual(UsageLevel(0.80), .critical)
     }
 
+    func testPaceCountsWithinThreePointsAsOnPace() {
+        XCTAssertEqual(Pace(used: 0.87, elapsed: 0.56), .over(31))
+        XCTAssertEqual(Pace(used: 0.30, elapsed: 0.55), .under(25))
+        XCTAssertEqual(Pace(used: 0.58, elapsed: 0.55), .on)
+    }
+
     func testReconcilePreservesValidServerReset() throws {
         let previous = usageResponse(
             fiveHour: UsageBucket(utilization: 100.0, resetsAt: "2026-03-05T18:00:00Z")

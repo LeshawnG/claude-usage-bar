@@ -59,8 +59,8 @@ private func menuBarInk() -> NSColor {
     NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .white : .black
 }
 
-private func drawRow(label: String, baseline: CGFloat, ink: NSColor, pct: Double?, pctRightEdge: CGFloat, drawBar: (CGFloat, CGFloat) -> Void) {
-    let labelText = text(label, font: labelFont, ink: ink)
+private func drawRow(label: String, baseline: CGFloat, ink: NSColor, labelInk: NSColor, pct: Double?, pctRightEdge: CGFloat, drawBar: (CGFloat, CGFloat) -> Void) {
+    let labelText = text(label, font: labelFont, ink: labelInk)
     labelText.draw(at: NSPoint(x: round(logoSize + gap + labelWidth - labelText.size().width), y: baseline - labelFont.ascender))
     drawBar(logoSize + gap + labelWidth + gap, round(baseline - labelFont.capHeight / 2 - barHeight / 2))
     if let pct {
@@ -70,6 +70,7 @@ private func drawRow(label: String, baseline: CGFloat, ink: NSColor, pct: Double
 }
 
 /// `marker5h`/`marker7d` are the share of each window elapsed, drawn as a notch; nil draws none.
+/// A window used faster than that gets an orange label.
 func renderIcon(
     pct5h: Double?,
     pct7d: Double,
@@ -84,14 +85,16 @@ func renderIcon(
         ? rows.map { ceil(pctText($0.1, ink: .black).size().width) }.reduce(pctWidth, max)
         : 0
     let width = iconWidth + pctColumn
-    let isColored = usesWarningColors && rows.contains { warningColor(for: $0.1) != nil }
+    func isOverPace(_ row: (String, Double, Double?)) -> Bool { row.2.map { Pace(used: row.1, elapsed: $0).isOver } ?? false }
+    let isColored = rows.contains(where: isOverPace) || usesWarningColors && rows.contains { warningColor(for: $0.1) != nil }
 
     let image = NSImage(size: NSSize(width: width, height: iconHeight), flipped: true) { _ in
         let ink = isColored ? menuBarInk() : .black
         drawClaudeLogo(ink: ink)
         for ((label, pct, marker), baseline) in zip(rows, baselines(rows: rows.count)) {
             let fill = usesWarningColors ? warningColor(for: pct) ?? ink : ink
-            drawRow(label: label, baseline: baseline, ink: ink, pct: showsPercentages ? pct : nil, pctRightEdge: width) { x, y in
+            let labelInk = isOverPace((label, pct, marker)) ? NSColor.systemOrange : ink
+            drawRow(label: label, baseline: baseline, ink: ink, labelInk: labelInk, pct: showsPercentages ? pct : nil, pctRightEdge: width) { x, y in
                 drawBar(x: x, y: y, pct: pct, ink: ink, fill: fill, marker: marker)
             }
         }
@@ -105,7 +108,7 @@ func renderUnauthenticatedIcon() -> NSImage {
     let image = NSImage(size: NSSize(width: iconWidth, height: iconHeight), flipped: true) { _ in
         drawClaudeLogo(ink: .black)
         for (label, baseline) in zip(["5h", "7d"], baselines(rows: 2)) {
-            drawRow(label: label, baseline: baseline, ink: .black, pct: nil, pctRightEdge: iconWidth) { x, y in
+            drawRow(label: label, baseline: baseline, ink: .black, labelInk: .black, pct: nil, pctRightEdge: iconWidth) { x, y in
                 drawDashedBar(x: x, y: y)
             }
         }

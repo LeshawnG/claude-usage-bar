@@ -17,4 +17,9 @@ final class MenuBarIconRendererTests: XCTestCase {
         XCTAssertFalse(icon(0.60, colors: true).isTemplate)
         XCTAssertTrue(icon(0.95, colors: false).isTemplate)
     }
+
+    func testOverPaceLabelsNeedAColoredIcon() {
+        XCTAssertFalse(renderIcon(pct5h: 0.50, pct7d: 0.30, showsPercentages: false, marker5h: 0.30, marker7d: 0.55).isTemplate)
+        XCTAssertTrue(renderIcon(pct5h: 0.20, pct7d: 0.30, showsPercentages: false, marker5h: 0.30, marker7d: 0.55).isTemplate)
+    }
 }
