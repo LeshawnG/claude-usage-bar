@@ -58,13 +58,15 @@ struct PopoverView: View {
         if service.hasFiveHourWindow {
             UsageBucketRow(
                 label: "5-Hour Window",
-                bucket: service.usage?.fiveHour
+                bucket: service.usage?.fiveHour,
+                elapsed: service.showsPopoverPace ? service.progress5h : nil
             )
         }
 
         UsageBucketRow(
             label: "7-Day Window",
-            bucket: service.usage?.sevenDay
+            bucket: service.usage?.sevenDay,
+            elapsed: service.showsPopoverPace ? service.progress7d : nil
         )
 
         let perModel = service.usage?.perModelWeekly ?? []
@@ -235,12 +237,24 @@ struct ErrorLabel: View {
 private struct UsageBucketRow: View {
     let label: String
     let bucket: UsageBucket?
+    /// Share of the window elapsed; nil hides the pace marker and words.
+    var elapsed: Double? = nil
+
+    private var pace: Pace? {
+        guard let elapsed, let used = bucket?.utilization else { return nil }
+        return Pace(used: used / 100.0, elapsed: elapsed)
+    }
+
+    private var paceSuffix: String {
+        pace.map { " · \($0.label)" } ?? ""
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
                     .font(.subheadline)
+                    .foregroundStyle(pace?.isOver == true ? Color.orange : Color.primary)
                 Spacer()
                 Text(percentageText)
                     .font(.subheadline)
@@ -248,11 +262,12 @@ private struct UsageBucketRow: View {
             }
             UsageBar(
                 value: (bucket?.utilization ?? 0) / 100.0,
-                color: colorForPct((bucket?.utilization ?? 0) / 100.0)
+                color: colorForPct((bucket?.utilization ?? 0) / 100.0),
+                elapsed: pace == nil ? nil : elapsed
             )
             Group {
                 if let resetDate = bucket?.resetsAtDate {
-                    Text("Resets \(resetDate, style: .relative)")
+                    Text("Resets \(resetDate, style: .relative)\(paceSuffix)")
                 } else if bucket?.utilization == 0 {
                     Text("Starts with your next message")
                 }
@@ -303,23 +318,32 @@ private func colorForPct(_ pct: Double) -> Color {
 
 /// Drawn instead of a tinted ProgressView, which can fall back to the system
 /// accent color after a light/dark switch. Same 6pt bar in an 18pt row.
+/// With `elapsed`, a gap marks now and a lighter band shows allowance not yet used.
 private struct UsageBar: View {
     let value: Double
     let color: Color
+    var elapsed: Double? = nil
 
     var body: some View {
-        GeometryReader { geometry in
-            Capsule()
-                .fill(.quaternary)
-                .overlay(alignment: .leading) {
-                    Capsule()
-                        .fill(color)
-                        .frame(width: geometry.size.width * min(value, 1))
-                }
+        Canvas { context, size in
+            context.fill(capsule(width: size.width, height: size.height), with: .style(HierarchicalShapeStyle.quaternary))
+            if let elapsed, elapsed > value {
+                context.fill(capsule(width: size.width * elapsed, height: size.height), with: .color(.primary.opacity(0.22)))
+            }
+            context.fill(capsule(width: size.width * min(value, 1), height: size.height), with: .color(color))
+            if let elapsed {
+                context.blendMode = .clear
+                context.fill(Path(CGRect(x: (size.width * elapsed).rounded() - 1, y: 0, width: 2, height: size.height)), with: .color(.black))
+            }
         }
         .frame(height: 6)
         .padding(.vertical, 6)
     }
+
+    private func capsule(width: CGFloat, height: CGFloat) -> Path {
+        Path(roundedRect: CGRect(x: 0, y: 0, width: width, height: height), cornerRadius: min(width, height) / 2)
+    }
+}
 }
 
 /// Calls `action` each time the hosting window becomes key, which for the menu bar
@@ -346,6 +370,16 @@ private struct WindowKeyObserver: NSViewRepresentable {
                     self?.action()
                 }
             }
+        }
+    }
+}
+
+private extension Pace {
+    var label: String {
+        switch self {
+        case .under(let points): return "\(points)% under pace"
+        case .on: return "on pace"
+        case .over(let points): return "\(points)% over pace"
         }
     }
 }

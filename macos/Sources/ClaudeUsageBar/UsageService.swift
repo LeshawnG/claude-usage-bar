@@ -16,6 +16,7 @@ class UsageService: ObservableObject {
     @Published private(set) var hasFiveHourWindow: Bool
     @Published private(set) var showsMenuBarPercentages: Bool
     @Published private(set) var showsTimeMarkers: Bool
+    @Published private(set) var showsPopoverPace: Bool
     @Published private(set) var usesWarningColors: Bool
     @Published private(set) var refreshesOnOpen: Bool
 
@@ -62,6 +63,7 @@ class UsageService: ObservableObject {
     nonisolated private static let hasFiveHourWindowKey = "hasFiveHourWindow"
     nonisolated private static let showsMenuBarPercentagesKey = "showsMenuBarPercentages"
     nonisolated private static let showsTimeMarkersKey = "showsTimeMarkers"
+    nonisolated private static let showsPopoverPaceKey = "showsPopoverPace"
     nonisolated private static let usesWarningColorsKey = "usesWarningColors"
     nonisolated private static let refreshesOnOpenKey = "refreshesOnOpen"
     nonisolated private static let loopbackHosts: Set<String> = ["localhost", "127.0.0.1", "::1"]
@@ -126,6 +128,12 @@ class UsageService: ObservableObject {
         updateMarkerTimer()
     }
 
+    func setShowsPopoverPace(_ shows: Bool) {
+        showsPopoverPace = shows
+        defaults.set(shows, forKey: Self.showsPopoverPaceKey)
+        updateMarkerTimer()
+    }
+
     func setUsesWarningColors(_ uses: Bool) {
         usesWarningColors = uses
         defaults.set(uses, forKey: Self.usesWarningColorsKey)
@@ -151,7 +159,7 @@ class UsageService: ObservableObject {
     private func updateMarkerTimer() {
         markerTimer?.invalidate()
         markerTimer = nil
-        guard showsTimeMarkers else { return }
+        guard showsTimeMarkers || showsPopoverPace else { return }
         let t = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.isAuthenticated else { return }
@@ -219,6 +227,7 @@ class UsageService: ObservableObject {
         self.hasFiveHourWindow = defaults.object(forKey: Self.hasFiveHourWindowKey) as? Bool ?? true
         self.showsMenuBarPercentages = defaults.bool(forKey: Self.showsMenuBarPercentagesKey)
         self.showsTimeMarkers = defaults.bool(forKey: Self.showsTimeMarkersKey)
+        self.showsPopoverPace = defaults.bool(forKey: Self.showsPopoverPaceKey)
         self.usesWarningColors = defaults.bool(forKey: Self.usesWarningColorsKey)
         self.refreshesOnOpen = defaults.bool(forKey: Self.refreshesOnOpenKey)
         let stored = UserDefaults.standard.integer(forKey: "pollingMinutes")
