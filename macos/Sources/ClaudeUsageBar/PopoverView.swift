@@ -344,7 +344,6 @@ private struct UsageBar: View {
         Path(roundedRect: CGRect(x: 0, y: 0, width: width, height: height), cornerRadius: min(width, height) / 2)
     }
 }
-}
 
 /// Calls `action` each time the hosting window becomes key, which for the menu bar
 /// popover is every time it opens. Its view stays in the window between opens, so
