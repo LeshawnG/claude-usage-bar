@@ -7,8 +7,8 @@ struct SettingsWindowContent: View {
     @ObservedObject var appUpdater: AppUpdater
 
     var body: some View {
-        Form {
-            Section("General") {
+        TabView {
+            settingsTab("General", systemImage: "gearshape") {
                 LaunchAtLoginToggle()
 
                 Picker("Polling Interval", selection: Binding(
@@ -28,7 +28,7 @@ struct SettingsWindowContent: View {
                 .help("Updates when you open the popover if the last update is 2 or more minutes old.")
             }
 
-            Section("Menu Bar") {
+            settingsTab("Menu Bar", systemImage: "menubar.rectangle") {
                 Toggle("Show percentages", isOn: Binding(
                     get: { service.showsMenuBarPercentages },
                     set: { service.setShowsMenuBarPercentages($0) }
@@ -37,45 +37,60 @@ struct SettingsWindowContent: View {
                     get: { service.showsTimeMarkers },
                     set: { service.setShowsTimeMarkers($0) }
                 ))
-                .help("A notch on each bar shows how far through the window you are.")
+                .help("A gap on each bar marks how far through the window you are. 5h and 7d turn orange when you're using faster than that.")
                 Toggle("Color bars at 60% and 80%", isOn: Binding(
                     get: { service.usesWarningColors },
                     set: { service.setUsesWarningColors($0) }
                 ))
             }
 
-            Section("Notifications") {
+            settingsTab("Popover", systemImage: "macwindow") {
+                Toggle("Show pace on the 5-hour and 7-day bars", isOn: Binding(
+                    get: { service.showsPopoverPace },
+                    set: { service.setShowsPopoverPace($0) }
+                ))
+                .help("Marks how far through each window you are, shades allowance not yet used, and says whether you're over or under pace.")
+            }
+
+            settingsTab("Notifications", systemImage: "bell") {
                 if !notificationService.isAvailable {
                     Text(notificationsUnavailableMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
-                if service.hasFiveHourWindow {
+                Group {
+                    if service.hasFiveHourWindow {
+                        ThresholdSlider(
+                            label: "5-hour window",
+                            value: notificationService.threshold5h,
+                            onChange: { notificationService.setThreshold5h($0) }
+                        )
+                    }
                     ThresholdSlider(
-                        label: "5-hour window",
-                        value: notificationService.threshold5h,
-                        onChange: { notificationService.setThreshold5h($0) }
+                        label: "7-day window",
+                        value: notificationService.threshold7d,
+                        onChange: { notificationService.setThreshold7d($0) }
+                    )
+                    ThresholdSlider(
+                        label: "Extra usage",
+                        value: notificationService.thresholdExtra,
+                        onChange: { notificationService.setThresholdExtra($0) }
                     )
                 }
-                ThresholdSlider(
-                    label: "7-day window",
-                    value: notificationService.threshold7d,
-                    onChange: { notificationService.setThreshold7d($0) }
-                )
-                ThresholdSlider(
-                    label: "Extra usage",
-                    value: notificationService.thresholdExtra,
-                    onChange: { notificationService.setThresholdExtra($0) }
-                )
-            }
-            .disabled(!notificationService.isAvailable)
-
-            if service.isAuthenticated {
-                AccountSection(service: service)
+                .disabled(!notificationService.isAvailable)
             }
 
-            Section("Updates") {
+            settingsTab("Account", systemImage: "person.crop.circle") {
+                if service.isAuthenticated {
+                    AccountSection(service: service)
+                } else {
+                    Text("Not signed in. Sign in from the menu bar.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            settingsTab("Updates", systemImage: "arrow.triangle.2.circlepath") {
                 LabeledContent("Version") {
                     Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown")
                         .textSelection(.enabled)
@@ -104,12 +119,19 @@ struct SettingsWindowContent: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .frame(width: 400)
-        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             focusSettingsWindow()
         }
+    }
+
+    private func settingsTab<Content: View>(_ title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
+        Form {
+            content()
+        }
+        .formStyle(.grouped)
+        .frame(width: 420)
+        .fixedSize(horizontal: false, vertical: true)
+        .tabItem { Label(title, systemImage: systemImage) }
     }
 }
 
